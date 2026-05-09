@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../data/models/product.dart';
+import '../../../data/models/uom.dart';
 import '../../../data/repositories/app_state_scope.dart';
 import 'return_order_page.dart';
 
@@ -16,7 +17,9 @@ class ReturnSwapOrderPage extends StatefulWidget {
 class _ReturnSwapOrderPageState extends State<ReturnSwapOrderPage> {
   final _notesController = TextEditingController();
   String? _returnedProductId;
+  String? _returnedUomId;
   String? _replacementProductId;
+  String? _replacementUomId;
   String? _reason;
   int _returnedQuantity = 0;
   int _replacementQuantity = 0;
@@ -84,24 +87,48 @@ class _ReturnSwapOrderPageState extends State<ReturnSwapOrderPage> {
               title: 'Returned Product',
               products: products,
               selectedProductId: _returnedProductId,
+              selectedUomId: _returnedUomId,
+              availableUoms: _returnedProductId == null
+                  ? const []
+                  : repository.getUomsForProduct(
+                      products.firstWhere((p) => p.id == _returnedProductId),
+                    ),
               quantity: _returnedQuantity,
-              onProductChanged: (value) =>
-                  setState(() => _returnedProductId = value),
-              onQuantityChanged: (value) => setState(() {
-                _returnedQuantity = value < 0 ? 0 : value;
+              onProductChanged: (value) => setState(() {
+                _returnedProductId = value;
+                _returnedUomId = value == null
+                    ? null
+                    : products.firstWhere((p) => p.id == value).baseUomId;
               }),
+              onUomChanged: (uomId) =>
+                  setState(() => _returnedUomId = uomId),
+              onQuantityChanged: (value) =>
+                  setState(() => _returnedQuantity = value < 0 ? 0 : value),
             ),
             const SizedBox(height: 12),
             _ProductPickerSection(
               title: 'Replacement Product',
               products: products,
               selectedProductId: _replacementProductId,
+              selectedUomId: _replacementUomId,
+              availableUoms: _replacementProductId == null
+                  ? const []
+                  : repository.getUomsForProduct(
+                      products.firstWhere(
+                        (p) => p.id == _replacementProductId,
+                      ),
+                    ),
               quantity: _replacementQuantity,
-              onProductChanged: (value) =>
-                  setState(() => _replacementProductId = value),
-              onQuantityChanged: (value) => setState(() {
-                _replacementQuantity = value < 0 ? 0 : value;
+              onProductChanged: (value) => setState(() {
+                _replacementProductId = value;
+                _replacementUomId = value == null
+                    ? null
+                    : products.firstWhere((p) => p.id == value).baseUomId;
               }),
+              onUomChanged: (uomId) =>
+                  setState(() => _replacementUomId = uomId),
+              onQuantityChanged: (value) =>
+                  setState(() => _replacementQuantity = value < 0 ? 0 : value),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -158,10 +185,28 @@ class _ReturnSwapOrderPageState extends State<ReturnSwapOrderPage> {
       return;
     }
 
-    final returnOrder = AppStateScope.of(context).submitReturnSwapOrder(
+    final repository = AppStateScope.of(context);
+    final products = repository.getOwnSellableProducts();
+
+    final returnedProduct =
+        products.firstWhere((p) => p.id == _returnedProductId);
+    final replacementProduct =
+        products.firstWhere((p) => p.id == _replacementProductId);
+
+    final returnedUomId = _returnedUomId ?? returnedProduct.baseUomId;
+    final replacementUomId = _replacementUomId ?? replacementProduct.baseUomId;
+
+    final returnedUom = repository.getUomById(returnedUomId);
+    final replacementUom = repository.getUomById(replacementUomId);
+
+    final returnOrder = repository.submitReturnSwapOrder(
       returnedProductId: _returnedProductId!,
+      returnedUomId: returnedUomId,
+      returnedUomCode: returnedUom?.code ?? 'PCS',
       returnedQuantity: _returnedQuantity,
       replacementProductId: _replacementProductId!,
+      replacementUomId: replacementUomId,
+      replacementUomCode: replacementUom?.code ?? 'PCS',
       replacementQuantity: _replacementQuantity,
       reason: _reason!,
       photoCaptured: _photoCaptured,
@@ -188,16 +233,22 @@ class _ProductPickerSection extends StatelessWidget {
     required this.title,
     required this.products,
     required this.selectedProductId,
+    required this.selectedUomId,
+    required this.availableUoms,
     required this.quantity,
     required this.onProductChanged,
+    required this.onUomChanged,
     required this.onQuantityChanged,
   });
 
   final String title;
   final List<Product> products;
   final String? selectedProductId;
+  final String? selectedUomId;
+  final List<Uom> availableUoms;
   final int quantity;
   final ValueChanged<String?> onProductChanged;
+  final ValueChanged<String> onUomChanged;
   final ValueChanged<int> onQuantityChanged;
 
   @override
@@ -228,6 +279,33 @@ class _ProductPickerSection extends StatelessWidget {
                   .toList(),
               onChanged: onProductChanged,
             ),
+            if (availableUoms.length > 1) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: selectedUomId,
+                decoration: const InputDecoration(labelText: 'Unit'),
+                items: availableUoms
+                    .map(
+                      (uom) => DropdownMenuItem(
+                        value: uom.id,
+                        child: Text(uom.code),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) onUomChanged(value);
+                },
+              ),
+            ] else if (availableUoms.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Unit: ${availableUoms.first.code}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF6B7280),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [

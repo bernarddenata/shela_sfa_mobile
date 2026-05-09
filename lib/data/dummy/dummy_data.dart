@@ -5,6 +5,7 @@ import '../models/product.dart';
 import '../models/promo_check.dart';
 import '../models/sales_order.dart';
 import '../models/sync_item.dart';
+import '../models/uom.dart';
 import '../models/user_context.dart';
 
 class DummyData {
@@ -25,6 +26,13 @@ class DummyData {
     appCode: 'SHELA_SFA_MOBILE',
     companyCode: 'demo-distributor',
   );
+
+  static const uoms = [
+    Uom(id: 'uom_pcs', code: 'PCS', name: 'Pieces'),
+    Uom(id: 'uom_ctn', code: 'CTN', name: 'Carton'),
+    Uom(id: 'uom_box', code: 'BOX', name: 'Box'),
+    Uom(id: 'uom_pack', code: 'PACK', name: 'Pack'),
+  ];
 
   static final customers = [
     Customer(
@@ -75,6 +83,12 @@ class DummyData {
       status: BrandStatus.active,
     ),
     Brand(
+      id: 'brand_own_richeese',
+      name: 'Richeese',
+      brandType: BrandType.ownBrand,
+      status: BrandStatus.active,
+    ),
+    Brand(
       id: 'brand_comp_tango',
       name: 'Tango',
       brandType: BrandType.competitorBrand,
@@ -103,6 +117,8 @@ class DummyData {
       brandName: 'Nabati',
       productType: ProductType.ownProduct,
       category: 'Wafer',
+      baseUomId: 'uom_pcs',
+      availableUomIds: ['uom_pcs', 'uom_ctn'],
       price: 10000,
       canvasStock: 50,
       isSellable: true,
@@ -115,6 +131,8 @@ class DummyData {
       brandName: 'Nabati',
       productType: ProductType.ownProduct,
       category: 'Biscuit',
+      baseUomId: 'uom_pcs',
+      availableUomIds: ['uom_pcs', 'uom_ctn'],
       price: 12000,
       canvasStock: 40,
       isSellable: true,
@@ -123,10 +141,12 @@ class DummyData {
       id: 'prod_003',
       name: 'Richeese Wafer',
       sku: 'RCH-WFR-01',
-      brandId: 'brand_own_nabati',
-      brandName: 'Nabati',
+      brandId: 'brand_own_richeese',
+      brandName: 'Richeese',
       productType: ProductType.ownProduct,
       category: 'Wafer',
+      baseUomId: 'uom_pcs',
+      availableUomIds: ['uom_pcs', 'uom_ctn'],
       price: 15000,
       canvasStock: 25,
       isSellable: true,
@@ -139,6 +159,8 @@ class DummyData {
       brandName: 'Nabati',
       productType: ProductType.ownProduct,
       category: 'Chocolate',
+      baseUomId: 'uom_pcs',
+      availableUomIds: ['uom_pcs', 'uom_ctn'],
       price: 11000,
       canvasStock: 30,
       isSellable: true,
@@ -151,6 +173,8 @@ class DummyData {
       brandName: 'Nabati',
       productType: ProductType.ownProduct,
       category: 'Snack',
+      baseUomId: 'uom_pcs',
+      availableUomIds: ['uom_pcs', 'uom_ctn'],
       price: 9000,
       canvasStock: 60,
       isSellable: true,
@@ -163,6 +187,8 @@ class DummyData {
       brandName: 'Tango',
       productType: ProductType.competitorProduct,
       category: 'Wafer',
+      baseUomId: 'uom_pcs',
+      availableUomIds: ['uom_pcs'],
       price: 9500,
       canvasStock: 0,
       isSellable: false,
@@ -175,6 +201,8 @@ class DummyData {
       brandName: 'Roma',
       productType: ProductType.competitorProduct,
       category: 'Biscuit',
+      baseUomId: 'uom_pcs',
+      availableUomIds: ['uom_pcs'],
       price: 10000,
       canvasStock: 0,
       isSellable: false,
@@ -187,6 +215,8 @@ class DummyData {
       brandName: 'Khong Guan',
       productType: ProductType.competitorProduct,
       category: 'Biscuit',
+      baseUomId: 'uom_pcs',
+      availableUomIds: ['uom_pcs'],
       price: 18000,
       canvasStock: 0,
       isSellable: false,

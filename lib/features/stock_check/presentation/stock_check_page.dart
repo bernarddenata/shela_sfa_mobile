@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/router/app_router.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/stock_check.dart';
+import '../../../data/models/uom.dart';
 import '../../../data/repositories/app_state_scope.dart';
 
 class StockCheckPage extends StatefulWidget {
@@ -87,6 +88,8 @@ class _StockCheckPageState extends State<StockCheckPage> {
                   index: entry.key,
                   row: entry.value,
                   products: products,
+                  availableUomsFor: (product) =>
+                      repository.getUomsForProduct(product),
                   canRemove: _rows.length > 1,
                   onChanged: () => setState(() {}),
                   onRemove: () => setState(() => _rows.removeAt(entry.key)),
@@ -149,11 +152,15 @@ class _StockCheckPageState extends State<StockCheckPage> {
         _showMessage('Please select product.');
         return;
       }
+      final uomId = row.uomId ?? product.baseUomId;
+      final uom = repository.getUomById(uomId);
       items.add(
         StockCheckItem(
           productId: product.id,
           productName: product.name,
           sku: product.sku,
+          uomId: uomId,
+          uomCode: uom?.code ?? 'PCS',
           quantity: quantity,
           status: row.status!,
         ),
@@ -184,6 +191,7 @@ class _StockCheckPageState extends State<StockCheckPage> {
 
 class _StockRowState {
   String? productId;
+  String? uomId;
   String quantityText = '';
   StockStatus? status;
 }
@@ -193,6 +201,7 @@ class _StockRowCard extends StatelessWidget {
     required this.index,
     required this.row,
     required this.products,
+    required this.availableUomsFor,
     required this.canRemove,
     required this.onChanged,
     required this.onRemove,
@@ -201,12 +210,20 @@ class _StockRowCard extends StatelessWidget {
   final int index;
   final _StockRowState row;
   final List<Product> products;
+  final List<Uom> Function(Product product) availableUomsFor;
   final bool canRemove;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final selectedProduct = row.productId == null
+        ? null
+        : products.where((p) => p.id == row.productId).firstOrNull;
+    final availableUoms =
+        selectedProduct == null ? <Uom>[] : availableUomsFor(selectedProduct);
+    final effectiveUomId = row.uomId ?? selectedProduct?.baseUomId;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -244,9 +261,38 @@ class _StockRowCard extends StatelessWidget {
                   .toList(),
               onChanged: (value) {
                 row.productId = value;
+                row.uomId = null;
                 onChanged();
               },
             ),
+            if (availableUoms.length > 1) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: effectiveUomId,
+                decoration: const InputDecoration(labelText: 'Unit'),
+                items: availableUoms
+                    .map(
+                      (uom) => DropdownMenuItem(
+                        value: uom.id,
+                        child: Text(uom.code),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  row.uomId = value;
+                  onChanged();
+                },
+              ),
+            ] else if (availableUoms.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Unit: ${availableUoms.first.code}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF6B7280),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               keyboardType: TextInputType.number,

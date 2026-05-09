@@ -16,6 +16,8 @@ class Product {
     required this.brandName,
     required this.productType,
     required this.category,
+    required this.baseUomId,
+    required this.availableUomIds,
     required this.price,
     required this.canvasStock,
     required this.isSellable,
@@ -28,6 +30,8 @@ class Product {
   final String brandName;
   final ProductType productType;
   final String category;
+  final String baseUomId;
+  final List<String> availableUomIds;
   final int price;
   final int canvasStock;
   final bool isSellable;
@@ -41,6 +45,8 @@ class Product {
       brandName: brandName,
       productType: productType,
       category: category,
+      baseUomId: baseUomId,
+      availableUomIds: availableUomIds,
       price: price,
       canvasStock: canvasStock ?? this.canvasStock,
       isSellable: isSellable,

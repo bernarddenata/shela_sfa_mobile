@@ -5,7 +5,9 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatters.dart';
 import '../../../data/models/product.dart';
+import '../../../data/models/uom.dart';
 import '../../../data/repositories/app_state_scope.dart';
+import '../../../data/repositories/mock_sfa_repository.dart';
 
 const returnReasons = [
   'Expired',
@@ -25,6 +27,7 @@ class ReturnOrderPage extends StatefulWidget {
 class _ReturnOrderPageState extends State<ReturnOrderPage> {
   final _notesController = TextEditingController();
   final Map<String, int> _quantities = {};
+  final Map<String, String> _selectedUomIds = {};
   String? _reason;
   bool _photoCaptured = false;
 
@@ -33,6 +36,9 @@ class _ReturnOrderPageState extends State<ReturnOrderPage> {
     _notesController.dispose();
     super.dispose();
   }
+
+  String _uomIdFor(Product product) =>
+      _selectedUomIds[product.id] ?? product.baseUomId;
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +112,11 @@ class _ReturnOrderPageState extends State<ReturnOrderPage> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _ReturnProductCard(
                   product: product,
+                  availableUoms: repository.getUomsForProduct(product),
+                  selectedUomId: _uomIdFor(product),
                   quantity: _quantities[product.id] ?? 0,
+                  onUomChanged: (uomId) =>
+                      setState(() => _selectedUomIds[product.id] = uomId),
                   onChanged: (quantity) => _setQuantity(product.id, quantity),
                 ),
               ),
@@ -141,8 +151,21 @@ class _ReturnOrderPageState extends State<ReturnOrderPage> {
       return;
     }
 
-    final returnOrder = AppStateScope.of(context).submitReturnOrder(
-      quantitiesByProductId: Map.unmodifiable(_quantities),
+    final repository = AppStateScope.of(context);
+    final lineItems = _quantities.entries.map((entry) {
+      final product = repository.getProductById(entry.key)!;
+      final uomId = _uomIdFor(product);
+      final uom = repository.getUomById(uomId);
+      return ReturnLineInput(
+        productId: entry.key,
+        uomId: uomId,
+        uomCode: uom?.code ?? 'PCS',
+        quantity: entry.value,
+      );
+    }).toList();
+
+    final returnOrder = repository.submitReturnOrder(
+      lineItems: lineItems,
       reason: _reason!,
       photoCaptured: _photoCaptured,
       notes: _notesController.text.trim(),
@@ -165,12 +188,18 @@ class _ReturnOrderPageState extends State<ReturnOrderPage> {
 class _ReturnProductCard extends StatelessWidget {
   const _ReturnProductCard({
     required this.product,
+    required this.availableUoms,
+    required this.selectedUomId,
     required this.quantity,
+    required this.onUomChanged,
     required this.onChanged,
   });
 
   final Product product;
+  final List<Uom> availableUoms;
+  final String selectedUomId;
   final int quantity;
+  final ValueChanged<String> onUomChanged;
   final ValueChanged<int> onChanged;
 
   @override
@@ -202,6 +231,38 @@ class _ReturnProductCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(product.sku),
+            if (availableUoms.length > 1) ...[
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: selectedUomId,
+                decoration: const InputDecoration(
+                  labelText: 'Unit',
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                items: availableUoms
+                    .map(
+                      (uom) => DropdownMenuItem(
+                        value: uom.id,
+                        child: Text(uom.code),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) onUomChanged(value);
+                },
+              ),
+            ] else if (availableUoms.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Unit: ${availableUoms.first.code}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF6B7280),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [

@@ -17,11 +17,15 @@ class SalesOrderItem {
     required this.sku,
     required this.quantity,
     required this.price,
+    this.uomId = 'uom_pcs',
+    this.uomCode = 'PCS',
   });
 
   final String productId;
   final String productName;
   final String sku;
+  final String uomId;
+  final String uomCode;
   final int quantity;
   final int price;
 

@@ -12,11 +12,49 @@ import '../models/promo_check.dart';
 import '../models/return_order.dart';
 import '../models/sales_order.dart';
 import '../models/store_photo.dart';
+import '../models/sync_event.dart';
 import '../models/sync_item.dart';
 import '../models/stock_check.dart';
+import '../models/uom.dart';
 import '../models/user_context.dart';
 import '../models/visit.dart';
 import '../models/visit_note.dart';
+
+// ---------------------------------------------------------------------------
+// Input DTOs for product-based transactions
+// ---------------------------------------------------------------------------
+
+class OrderLineInput {
+  const OrderLineInput({
+    required this.productId,
+    required this.uomId,
+    required this.uomCode,
+    required this.quantity,
+  });
+
+  final String productId;
+  final String uomId;
+  final String uomCode;
+  final int quantity;
+}
+
+class ReturnLineInput {
+  const ReturnLineInput({
+    required this.productId,
+    required this.uomId,
+    required this.uomCode,
+    required this.quantity,
+  });
+
+  final String productId;
+  final String uomId;
+  final String uomCode;
+  final int quantity;
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot classes
+// ---------------------------------------------------------------------------
 
 class HomeDashboardSnapshot {
   const HomeDashboardSnapshot({
@@ -94,6 +132,10 @@ class VisitSummarySnapshot {
       visitNoteCount > 0;
 }
 
+// ---------------------------------------------------------------------------
+// Repository
+// ---------------------------------------------------------------------------
+
 class MockSfaRepository extends ChangeNotifier {
   MockSfaRepository();
 
@@ -103,6 +145,7 @@ class MockSfaRepository extends ChangeNotifier {
   final List<CallPlan> _callPlans = [];
   final List<Visit> _visits = [];
   final List<SyncItem> _syncItems = [];
+  final Map<String, List<SyncEvent>> _syncEvents = {};
   final List<SalesOrder> _salesOrders = [];
   final List<ReturnOrder> _returnOrders = [];
   final List<PromoCheck> _promoChecks = [];
@@ -128,6 +171,10 @@ class MockSfaRepository extends ChangeNotifier {
 
   bool get isAuthenticated => _activeUser != null;
 
+  // ---------------------------------------------------------------------------
+  // Auth
+  // ---------------------------------------------------------------------------
+
   bool login({
     required String companyCode,
     required String username,
@@ -151,6 +198,7 @@ class MockSfaRepository extends ChangeNotifier {
     _callPlans.clear();
     _visits.clear();
     _syncItems.clear();
+    _syncEvents.clear();
     _salesOrders.clear();
     _returnOrders.clear();
     _promoChecks.clear();
@@ -164,6 +212,34 @@ class MockSfaRepository extends ChangeNotifier {
     _canvasStockByProductId.clear();
     notifyListeners();
   }
+
+  // ---------------------------------------------------------------------------
+  // UOM
+  // ---------------------------------------------------------------------------
+
+  List<Uom> getUoms() {
+    return List.unmodifiable(DummyData.uoms);
+  }
+
+  Uom? getUomById(String uomId) {
+    for (final uom in DummyData.uoms) {
+      if (uom.id == uomId) {
+        return uom;
+      }
+    }
+    return null;
+  }
+
+  List<Uom> getUomsForProduct(Product product) {
+    return product.availableUomIds
+        .map((id) => getUomById(id))
+        .whereType<Uom>()
+        .toList(growable: false);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dashboard
+  // ---------------------------------------------------------------------------
 
   HomeDashboardSnapshot getHomeDashboard() {
     final callPlans = getTodayCallPlans();
@@ -193,6 +269,10 @@ class MockSfaRepository extends ChangeNotifier {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Customers
+  // ---------------------------------------------------------------------------
+
   List<Customer> getBranchCustomers() {
     final user = _activeUser;
     if (user == null) {
@@ -203,6 +283,19 @@ class MockSfaRepository extends ChangeNotifier {
         .where((customer) => customer.branchId == user.branchId)
         .toList(growable: false);
   }
+
+  Customer? getCustomerById(String customerId) {
+    for (final customer in DummyData.customers) {
+      if (customer.id == customerId) {
+        return customer;
+      }
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Call Plans & Visits
+  // ---------------------------------------------------------------------------
 
   List<CallPlan> getTodayCallPlans() {
     final user = _activeUser;
@@ -223,160 +316,6 @@ class MockSfaRepository extends ChangeNotifier {
           ..sort((a, b) => a.plannedSequence.compareTo(b.plannedSequence));
 
     return List.unmodifiable(plans);
-  }
-
-  Customer? getCustomerById(String customerId) {
-    for (final customer in DummyData.customers) {
-      if (customer.id == customerId) {
-        return customer;
-      }
-    }
-    return null;
-  }
-
-  List<Product> getProducts() {
-    _ensureCanvasStock();
-    return [...DummyData.products, ..._mockProducts]
-        .map(
-          (product) => product.copyWith(
-            canvasStock: product.isSellable
-                ? (_canvasStockByProductId[product.id] ?? product.canvasStock)
-                : 0,
-          ),
-        )
-        .toList(growable: false);
-  }
-
-  List<Product> getOwnSellableProducts() {
-    return getProducts()
-        .where(
-          (product) =>
-              product.productType == ProductType.ownProduct &&
-              product.isSellable,
-        )
-        .toList(growable: false);
-  }
-
-  List<Product> getCompetitorProducts({String? brandId}) {
-    return getProducts()
-        .where(
-          (product) =>
-              product.productType == ProductType.competitorProduct &&
-              !product.isSellable &&
-              (brandId == null || product.brandId == brandId),
-        )
-        .toList(growable: false);
-  }
-
-  List<Brand> getBrands() {
-    return List.unmodifiable([...DummyData.brands, ..._mockBrands]);
-  }
-
-  List<Brand> getCompetitorBrands() {
-    return getBrands()
-        .where(
-          (brand) =>
-              brand.brandType == BrandType.competitorBrand &&
-              brand.status == BrandStatus.active,
-        )
-        .toList(growable: false);
-  }
-
-  Brand? getBrandById(String brandId) {
-    for (final brand in getBrands()) {
-      if (brand.id == brandId) {
-        return brand;
-      }
-    }
-    return null;
-  }
-
-  Brand? addCompetitorBrand(String name) {
-    final normalizedName = _normalizeName(name);
-    if (normalizedName.isEmpty) {
-      return null;
-    }
-
-    final exists = getBrands().any(
-      (brand) => _normalizeName(brand.name) == normalizedName,
-    );
-    if (exists) {
-      return null;
-    }
-
-    final now = DateTime.now();
-    final brand = Brand(
-      id: 'brand_comp_${now.microsecondsSinceEpoch}',
-      name: name.trim(),
-      brandType: BrandType.competitorBrand,
-      status: BrandStatus.active,
-    );
-    _mockBrands.add(brand);
-    notifyListeners();
-    return brand;
-  }
-
-  Product? addCompetitorProduct({
-    required String brandId,
-    required String name,
-    required String sku,
-    required String category,
-    int price = 0,
-  }) {
-    final brand = getBrandById(brandId);
-    final normalizedName = _normalizeName(name);
-    if (brand == null ||
-        brand.brandType != BrandType.competitorBrand ||
-        normalizedName.isEmpty ||
-        sku.trim().isEmpty) {
-      return null;
-    }
-
-    final exists = getProducts().any(
-      (product) => _normalizeName(product.name) == normalizedName,
-    );
-    if (exists) {
-      return null;
-    }
-
-    final now = DateTime.now();
-    final product = Product(
-      id: 'comp_prod_${now.microsecondsSinceEpoch}',
-      name: name.trim(),
-      sku: sku.trim(),
-      brandId: brand.id,
-      brandName: brand.name,
-      productType: ProductType.competitorProduct,
-      category: category.trim().isEmpty ? 'Competitor' : category.trim(),
-      price: price < 0 ? 0 : price,
-      canvasStock: 0,
-      isSellable: false,
-    );
-    _mockProducts.add(product);
-    notifyListeners();
-    return product;
-  }
-
-  Product? getProductById(String productId) {
-    for (final product in getProducts()) {
-      if (product.id == productId) {
-        return product;
-      }
-    }
-    return null;
-  }
-
-  List<PromoProgram> getPromoPrograms() {
-    return List.unmodifiable(DummyData.promoPrograms);
-  }
-
-  PromoProgram? getPromoProgramById(String promoId) {
-    for (final promo in DummyData.promoPrograms) {
-      if (promo.id == promoId) {
-        return promo;
-      }
-    }
-    return null;
   }
 
   CallPlan? getCallPlanById(String callPlanId) {
@@ -474,16 +413,13 @@ class MockSfaRepository extends ChangeNotifier {
     _replaceCallPlan(callPlan.copyWith(status: CallPlanStatus.inProgress));
 
     final customer = getCustomerById(callPlan.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: SyncItemType.visitCheckIn,
-        referenceId: visit.id,
-        title: 'Visit Check-in',
-        description: customer?.name ?? 'Customer visit',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: SyncItemType.visitCheckIn,
+      referenceId: visit.id,
+      title: 'Visit Check-in',
+      description: customer?.name ?? 'Customer visit',
+      now: now,
     );
 
     notifyListeners();
@@ -500,6 +436,172 @@ class MockSfaRepository extends ChangeNotifier {
         )
         .length;
   }
+
+  // ---------------------------------------------------------------------------
+  // Products
+  // ---------------------------------------------------------------------------
+
+  List<Product> getProducts() {
+    _ensureCanvasStock();
+    return [...DummyData.products, ..._mockProducts]
+        .map(
+          (product) => product.copyWith(
+            canvasStock: product.isSellable
+                ? (_canvasStockByProductId[product.id] ?? product.canvasStock)
+                : 0,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  List<Product> getOwnSellableProducts() {
+    return getProducts()
+        .where(
+          (product) =>
+              product.productType == ProductType.ownProduct &&
+              product.isSellable,
+        )
+        .toList(growable: false);
+  }
+
+  List<Product> getCompetitorProducts({String? brandId}) {
+    return getProducts()
+        .where(
+          (product) =>
+              product.productType == ProductType.competitorProduct &&
+              !product.isSellable &&
+              (brandId == null || product.brandId == brandId),
+        )
+        .toList(growable: false);
+  }
+
+  Product? getProductById(String productId) {
+    for (final product in getProducts()) {
+      if (product.id == productId) {
+        return product;
+      }
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Brands
+  // ---------------------------------------------------------------------------
+
+  List<Brand> getBrands() {
+    return List.unmodifiable([...DummyData.brands, ..._mockBrands]);
+  }
+
+  List<Brand> getCompetitorBrands() {
+    return getBrands()
+        .where(
+          (brand) =>
+              brand.brandType == BrandType.competitorBrand &&
+              brand.status == BrandStatus.active,
+        )
+        .toList(growable: false);
+  }
+
+  Brand? getBrandById(String brandId) {
+    for (final brand in getBrands()) {
+      if (brand.id == brandId) {
+        return brand;
+      }
+    }
+    return null;
+  }
+
+  Brand? addCompetitorBrand(String name) {
+    final normalizedName = _normalizeName(name);
+    if (normalizedName.isEmpty) {
+      return null;
+    }
+
+    final exists = getBrands().any(
+      (brand) => _normalizeName(brand.name) == normalizedName,
+    );
+    if (exists) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    final brand = Brand(
+      id: 'brand_comp_${now.microsecondsSinceEpoch}',
+      name: name.trim(),
+      brandType: BrandType.competitorBrand,
+      status: BrandStatus.active,
+    );
+    _mockBrands.add(brand);
+    notifyListeners();
+    return brand;
+  }
+
+  Product? addCompetitorProduct({
+    required String brandId,
+    required String name,
+    String sku = '',
+    String category = '',
+    int price = 0,
+  }) {
+    final brand = getBrandById(brandId);
+    final normalizedName = _normalizeName(name);
+    if (brand == null ||
+        brand.brandType != BrandType.competitorBrand ||
+        normalizedName.isEmpty) {
+      return null;
+    }
+
+    final exists = getProducts().any(
+      (product) => _normalizeName(product.name) == normalizedName,
+    );
+    if (exists) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    final resolvedSku = sku.trim().isEmpty
+        ? 'COMP-${now.millisecondsSinceEpoch.toString().substring(7)}'
+        : sku.trim();
+
+    final product = Product(
+      id: 'comp_prod_${now.microsecondsSinceEpoch}',
+      name: name.trim(),
+      sku: resolvedSku,
+      brandId: brand.id,
+      brandName: brand.name,
+      productType: ProductType.competitorProduct,
+      category: category.trim().isEmpty ? 'Competitor' : category.trim(),
+      baseUomId: 'uom_pcs',
+      availableUomIds: const ['uom_pcs'],
+      price: price < 0 ? 0 : price,
+      canvasStock: 0,
+      isSellable: false,
+    );
+    _mockProducts.add(product);
+    notifyListeners();
+    return product;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Promo Programs
+  // ---------------------------------------------------------------------------
+
+  List<PromoProgram> getPromoPrograms() {
+    return List.unmodifiable(DummyData.promoPrograms);
+  }
+
+  PromoProgram? getPromoProgramById(String promoId) {
+    for (final promo in DummyData.promoPrograms) {
+      if (promo.id == promoId) {
+        return promo;
+      }
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sales Orders
+  // ---------------------------------------------------------------------------
 
   List<SalesOrder> getSalesOrders() {
     final user = _activeUser;
@@ -577,369 +679,24 @@ class MockSfaRepository extends ChangeNotifier {
     return null;
   }
 
-  List<ReturnOrder> getReturnOrders() {
-    final user = _activeUser;
-    if (user == null) {
-      return const [];
-    }
-
-    final returns =
-        _returnOrders
-            .where((returnOrder) => returnOrder.employeeId == user.employeeId)
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return List.unmodifiable(returns);
-  }
-
-  ReturnOrder? getReturnOrderById(String returnOrderId) {
-    for (final returnOrder in _returnOrders) {
-      if (returnOrder.id == returnOrderId) {
-        return returnOrder;
-      }
-    }
-    return null;
-  }
-
-  List<PromoCheck> getPromoChecks() {
-    final user = _activeUser;
-    if (user == null) {
-      return const [];
-    }
-
-    final checks =
-        _promoChecks
-            .where((promoCheck) => promoCheck.employeeId == user.employeeId)
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return List.unmodifiable(checks);
-  }
-
-  PromoCheck? getPromoCheckById(String promoCheckId) {
-    for (final promoCheck in _promoChecks) {
-      if (promoCheck.id == promoCheckId) {
-        return promoCheck;
-      }
-    }
-    return null;
-  }
-
-  List<CompetitorActivity> getCompetitorActivities() {
-    final user = _activeUser;
-    if (user == null) {
-      return const [];
-    }
-
-    final activities =
-        _competitorActivities
-            .where((activity) => activity.employeeId == user.employeeId)
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return List.unmodifiable(activities);
-  }
-
-  CompetitorActivity? getCompetitorActivityById(String activityId) {
-    for (final activity in _competitorActivities) {
-      if (activity.id == activityId) {
-        return activity;
-      }
-    }
-    return null;
-  }
-
-  List<PlanogramCheck> getPlanogramChecks() {
-    final user = _activeUser;
-    if (user == null) {
-      return const [];
-    }
-
-    final checks =
-        _planogramChecks
-            .where((check) => check.employeeId == user.employeeId)
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return List.unmodifiable(checks);
-  }
-
-  PlanogramCheck? getPlanogramCheckById(String checkId) {
-    for (final check in _planogramChecks) {
-      if (check.id == checkId) {
-        return check;
-      }
-    }
-    return null;
-  }
-
-  List<StockCheck> getStockChecks() {
-    final user = _activeUser;
-    if (user == null) {
-      return const [];
-    }
-
-    final checks =
-        _stockChecks
-            .where((check) => check.employeeId == user.employeeId)
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return List.unmodifiable(checks);
-  }
-
-  StockCheck? getStockCheckById(String checkId) {
-    for (final check in _stockChecks) {
-      if (check.id == checkId) {
-        return check;
-      }
-    }
-    return null;
-  }
-
-  List<VisitNote> getVisitNotesForVisit(String visitId) {
-    final notes = _visitNotes.where((note) => note.visitId == visitId).toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return List.unmodifiable(notes);
-  }
-
-  List<StorePhoto> getStorePhotosForVisit(String visitId) {
-    final photos =
-        _storePhotos.where((photo) => photo.visitId == visitId).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return List.unmodifiable(photos);
-  }
-
-  List<SyncItem> getSyncItems() {
-    final items = [..._syncItems]
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return List.unmodifiable(items);
-  }
-
-  SyncItem? getSyncItemById(String syncItemId) {
-    for (final item in _syncItems) {
-      if (item.id == syncItemId) {
-        return item;
-      }
-    }
-    return null;
-  }
-
-  SyncCenterSnapshot getSyncCenterSnapshot() {
-    return SyncCenterSnapshot(
-      pendingSync: _syncItems
-          .where(
-            (item) =>
-                item.status == SyncStatus.queued ||
-                item.status == SyncStatus.syncing,
-          )
-          .length,
-      syncedToday: _syncItems
-          .where(
-            (item) =>
-                item.status == SyncStatus.synced &&
-                item.syncedAt != null &&
-                _isSameDay(item.syncedAt!, DateTime.now()),
-          )
-          .length,
-      failedSync: _syncItems
-          .where((item) => item.status == SyncStatus.failed)
-          .length,
-      lastSyncAt: _lastSyncAt,
-    );
-  }
-
-  Future<int> syncQueuedItems() async {
-    final indexes = <int>[];
-    for (var index = 0; index < _syncItems.length; index += 1) {
-      if (_syncItems[index].status == SyncStatus.queued) {
-        indexes.add(index);
-        _syncItems[index] = _syncItems[index].copyWith(
-          status: SyncStatus.syncing,
-          clearErrorMessage: true,
-        );
-      }
-    }
-
-    if (indexes.isEmpty) {
-      return 0;
-    }
-
-    notifyListeners();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
-    final now = DateTime.now();
-    for (final index in indexes) {
-      if (_syncItems[index].status == SyncStatus.syncing) {
-        _syncItems[index] = _syncItems[index].copyWith(
-          status: SyncStatus.synced,
-          syncedAt: now,
-          clearErrorMessage: true,
-        );
-      }
-    }
-    _lastSyncAt = now;
-    notifyListeners();
-    return indexes.length;
-  }
-
-  Future<int> retryFailedSyncItems() async {
-    final indexes = <int>[];
-    for (var index = 0; index < _syncItems.length; index += 1) {
-      if (_syncItems[index].status == SyncStatus.failed) {
-        indexes.add(index);
-        _syncItems[index] = _syncItems[index].copyWith(
-          status: SyncStatus.syncing,
-          clearErrorMessage: true,
-        );
-      }
-    }
-
-    if (indexes.isEmpty) {
-      return 0;
-    }
-
-    notifyListeners();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
-    final now = DateTime.now();
-    for (final index in indexes) {
-      if (_syncItems[index].status == SyncStatus.syncing) {
-        _syncItems[index] = _syncItems[index].copyWith(
-          status: SyncStatus.synced,
-          syncedAt: now,
-          clearErrorMessage: true,
-        );
-      }
-    }
-    _lastSyncAt = now;
-    notifyListeners();
-    return indexes.length;
-  }
-
-  Future<bool> retrySyncItem(String syncItemId) async {
-    final index = _syncItems.indexWhere((item) => item.id == syncItemId);
-    if (index < 0 || _syncItems[index].status != SyncStatus.failed) {
-      return false;
-    }
-
-    _syncItems[index] = _syncItems[index].copyWith(
-      status: SyncStatus.syncing,
-      clearErrorMessage: true,
-    );
-    notifyListeners();
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-
-    final now = DateTime.now();
-    if (_syncItems[index].status == SyncStatus.syncing) {
-      _syncItems[index] = _syncItems[index].copyWith(
-        status: SyncStatus.synced,
-        syncedAt: now,
-        clearErrorMessage: true,
-      );
-    }
-    _lastSyncAt = now;
-    notifyListeners();
-    return true;
-  }
-
-  bool cancelQueuedSyncItem(String syncItemId) {
-    final index = _syncItems.indexWhere((item) => item.id == syncItemId);
-    if (index < 0 || _syncItems[index].status != SyncStatus.queued) {
-      return false;
-    }
-    _syncItems[index] = _syncItems[index].copyWith(
-      status: SyncStatus.cancelled,
-      errorMessage: 'Cancelled locally. Transaction data was kept.',
-    );
-    notifyListeners();
-    return true;
-  }
-
-  bool simulateFailedSync() {
-    final index = _syncItems.indexWhere(
-      (item) => item.status == SyncStatus.queued,
-    );
-    if (index < 0) {
-      return false;
-    }
-    _syncItems[index] = _syncItems[index].copyWith(
-      status: SyncStatus.failed,
-      errorMessage: 'Network timeout. Please retry.',
-    );
-    notifyListeners();
-    return true;
-  }
-
-  bool clearSyncedSyncItems() {
-    final before = _syncItems.length;
-    _syncItems.removeWhere((item) => item.status == SyncStatus.synced);
-    if (_syncItems.length == before) {
-      return false;
-    }
-    notifyListeners();
-    return true;
-  }
-
-  VisitSummarySnapshot getVisitSummary(String visitId) {
-    final notes = getVisitNotesForVisit(visitId);
-    final regularOrders = _salesOrders
-        .where(
-          (order) =>
-              order.visitId == visitId &&
-              order.orderType == SalesOrderType.regular,
-        )
-        .length;
-    final canvasOrders = _salesOrders
-        .where(
-          (order) =>
-              order.visitId == visitId &&
-              order.orderType == SalesOrderType.canvas,
-        )
-        .length;
-
-    return VisitSummarySnapshot(
-      regularOrderCount: regularOrders,
-      canvasOrderCount: canvasOrders,
-      salesOrderCount: regularOrders + canvasOrders,
-      returnOrderCount: _returnOrders
-          .where((returnOrder) => returnOrder.visitId == visitId)
-          .length,
-      promoCheckCount: _promoChecks
-          .where((promoCheck) => promoCheck.visitId == visitId)
-          .length,
-      competitorActivityCount: _competitorActivities
-          .where((activity) => activity.visitId == visitId)
-          .length,
-      planogramCheckCount: _planogramChecks
-          .where((check) => check.visitId == visitId)
-          .length,
-      stockCheckCount: _stockChecks
-          .where((check) => check.visitId == visitId)
-          .length,
-      storePhotoCount: _storePhotos
-          .where((photo) => photo.visitId == visitId)
-          .length,
-      visitNoteCount: notes.length,
-      pendingSyncCount: getPendingSyncCountForVisit(visitId),
-      latestVisitNote: notes.isEmpty ? null : notes.first,
-    );
-  }
-
   SalesOrder? submitSalesOrder({
     required SalesOrderType orderType,
-    required Map<String, int> quantitiesByProductId,
+    required List<OrderLineInput> lineItems,
   }) {
     final visit = activeVisit;
     final user = _activeUser;
-    if (visit == null || user == null || quantitiesByProductId.isEmpty) {
+    if (visit == null || user == null || lineItems.isEmpty) {
       return null;
     }
 
     _ensureCanvasStock();
     final items = <SalesOrderItem>[];
-    for (final entry in quantitiesByProductId.entries) {
-      final quantity = entry.value;
-      if (quantity <= 0) {
+    for (final line in lineItems) {
+      if (line.quantity <= 0) {
         continue;
       }
 
-      final product = getProductById(entry.key);
+      final product = getProductById(line.productId);
       if (product == null ||
           product.productType != ProductType.ownProduct ||
           !product.isSellable) {
@@ -947,7 +704,7 @@ class MockSfaRepository extends ChangeNotifier {
       }
 
       if (orderType == SalesOrderType.canvas &&
-          quantity > (_canvasStockByProductId[product.id] ?? 0)) {
+          line.quantity > (_canvasStockByProductId[product.id] ?? 0)) {
         return null;
       }
 
@@ -956,7 +713,9 @@ class MockSfaRepository extends ChangeNotifier {
           productId: product.id,
           productName: product.name,
           sku: product.sku,
-          quantity: quantity,
+          uomId: line.uomId,
+          uomCode: line.uomCode,
+          quantity: line.quantity,
           price: product.price,
         ),
       );
@@ -1001,26 +760,50 @@ class MockSfaRepository extends ChangeNotifier {
     }
 
     final customer = getCustomerById(order.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: orderType == SalesOrderType.regular
-            ? SyncItemType.regularOrder
-            : SyncItemType.canvasOrder,
-        referenceId: order.id,
-        title: orderType.label,
-        description: '${customer?.name ?? 'Customer'} ${order.grandTotal}',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: orderType == SalesOrderType.regular
+          ? SyncItemType.regularOrder
+          : SyncItemType.canvasOrder,
+      referenceId: order.id,
+      title: orderType.label,
+      description: '${customer?.name ?? 'Customer'} ${order.grandTotal}',
+      now: now,
     );
 
     notifyListeners();
     return order;
   }
 
+  // ---------------------------------------------------------------------------
+  // Return Orders
+  // ---------------------------------------------------------------------------
+
+  List<ReturnOrder> getReturnOrders() {
+    final user = _activeUser;
+    if (user == null) {
+      return const [];
+    }
+
+    final returns =
+        _returnOrders
+            .where((returnOrder) => returnOrder.employeeId == user.employeeId)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(returns);
+  }
+
+  ReturnOrder? getReturnOrderById(String returnOrderId) {
+    for (final returnOrder in _returnOrders) {
+      if (returnOrder.id == returnOrderId) {
+        return returnOrder;
+      }
+    }
+    return null;
+  }
+
   ReturnOrder? submitReturnOrder({
-    required Map<String, int> quantitiesByProductId,
+    required List<ReturnLineInput> lineItems,
     required String reason,
     required bool photoCaptured,
     String notes = '',
@@ -1031,18 +814,17 @@ class MockSfaRepository extends ChangeNotifier {
         user == null ||
         reason.isEmpty ||
         !photoCaptured ||
-        quantitiesByProductId.isEmpty) {
+        lineItems.isEmpty) {
       return null;
     }
 
     final items = <ReturnOrderItem>[];
-    for (final entry in quantitiesByProductId.entries) {
-      final quantity = entry.value;
-      if (quantity <= 0) {
+    for (final line in lineItems) {
+      if (line.quantity <= 0) {
         continue;
       }
 
-      final product = getProductById(entry.key);
+      final product = getProductById(line.productId);
       if (product == null ||
           product.productType != ProductType.ownProduct ||
           !product.isSellable) {
@@ -1054,7 +836,9 @@ class MockSfaRepository extends ChangeNotifier {
           productId: product.id,
           productName: product.name,
           sku: product.sku,
-          quantity: quantity,
+          uomId: line.uomId,
+          uomCode: line.uomCode,
+          quantity: line.quantity,
         ),
       );
     }
@@ -1074,8 +858,12 @@ class MockSfaRepository extends ChangeNotifier {
 
   ReturnOrder? submitReturnSwapOrder({
     required String returnedProductId,
+    required String returnedUomId,
+    required String returnedUomCode,
     required int returnedQuantity,
     required String replacementProductId,
+    required String replacementUomId,
+    required String replacementUomCode,
     required int replacementQuantity,
     required String reason,
     required bool photoCaptured,
@@ -1105,15 +893,46 @@ class MockSfaRepository extends ChangeNotifier {
         productId: returnedProduct.id,
         productName: returnedProduct.name,
         sku: returnedProduct.sku,
+        uomId: returnedUomId,
+        uomCode: returnedUomCode,
         quantity: returnedQuantity,
       ),
       replacementItem: ReturnOrderItem(
         productId: replacementProduct.id,
         productName: replacementProduct.name,
         sku: replacementProduct.sku,
+        uomId: replacementUomId,
+        uomCode: replacementUomCode,
         quantity: replacementQuantity,
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Promo Checks
+  // ---------------------------------------------------------------------------
+
+  List<PromoCheck> getPromoChecks() {
+    final user = _activeUser;
+    if (user == null) {
+      return const [];
+    }
+
+    final checks =
+        _promoChecks
+            .where((promoCheck) => promoCheck.employeeId == user.employeeId)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(checks);
+  }
+
+  PromoCheck? getPromoCheckById(String promoCheckId) {
+    for (final promoCheck in _promoChecks) {
+      if (promoCheck.id == promoCheckId) {
+        return promoCheck;
+      }
+    }
+    return null;
   }
 
   PromoCheck? submitPromoCheck({
@@ -1147,20 +966,44 @@ class MockSfaRepository extends ChangeNotifier {
 
     _promoChecks.add(promoCheck);
     final customer = getCustomerById(promoCheck.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: SyncItemType.promoCheck,
-        referenceId: promoCheck.id,
-        title: 'Promo Check',
-        description: '${customer?.name ?? 'Customer'} ${promo.name}',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: SyncItemType.promoCheck,
+      referenceId: promoCheck.id,
+      title: 'Promo Check',
+      description: '${customer?.name ?? 'Customer'} ${promo.name}',
+      now: now,
     );
 
     notifyListeners();
     return promoCheck;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Competitor Activities
+  // ---------------------------------------------------------------------------
+
+  List<CompetitorActivity> getCompetitorActivities() {
+    final user = _activeUser;
+    if (user == null) {
+      return const [];
+    }
+
+    final activities =
+        _competitorActivities
+            .where((activity) => activity.employeeId == user.employeeId)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(activities);
+  }
+
+  CompetitorActivity? getCompetitorActivityById(String activityId) {
+    for (final activity in _competitorActivities) {
+      if (activity.id == activityId) {
+        return activity;
+      }
+    }
+    return null;
   }
 
   CompetitorActivity? submitCompetitorActivity({
@@ -1211,32 +1054,53 @@ class MockSfaRepository extends ChangeNotifier {
 
     _competitorActivities.add(activity);
     final customer = getCustomerById(activity.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: SyncItemType.competitorActivity,
-        referenceId: activity.id,
-        title: 'Competitor Activity',
-        description:
-            '${customer?.name ?? 'Customer'} ${activity.competitorBrand} ${activity.activityType.label}',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: SyncItemType.competitorActivity,
+      referenceId: activity.id,
+      title: 'Competitor Activity',
+      description:
+          '${customer?.name ?? 'Customer'} ${activity.competitorBrand} ${activity.activityType.label}',
+      now: now,
     );
 
     notifyListeners();
     return activity;
   }
 
+  // ---------------------------------------------------------------------------
+  // Planogram Checks
+  // ---------------------------------------------------------------------------
+
+  List<PlanogramCheck> getPlanogramChecks() {
+    final user = _activeUser;
+    if (user == null) {
+      return const [];
+    }
+
+    final checks =
+        _planogramChecks
+            .where((check) => check.employeeId == user.employeeId)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(checks);
+  }
+
+  PlanogramCheck? getPlanogramCheckById(String checkId) {
+    for (final check in _planogramChecks) {
+      if (check.id == checkId) {
+        return check;
+      }
+    }
+    return null;
+  }
+
   PlanogramCheck? submitPlanogramCheck({
     required bool beforePhotoCaptured,
     required ShelfArea shelfArea,
-    required ShelfLevel shelfLevel,
     required List<PlanogramOwnProductRow> ownProductRows,
     required List<PlanogramCompetitorProductRow> competitorProductRows,
-    required ShareOfShelfEstimate shareOfShelfEstimate,
     required PlanogramMainIssue mainIssue,
-    required RecommendedAction recommendedAction,
     required MerchandiserActionTaken actionTaken,
     required bool afterPhotoCaptured,
     required PlanogramComplianceStatus complianceStatus,
@@ -1278,10 +1142,6 @@ class MockSfaRepository extends ChangeNotifier {
       }
     }
 
-    if (shelfArea == ShelfArea.other && notes.trim().isEmpty) {
-      return null;
-    }
-
     final now = DateTime.now();
     final check = PlanogramCheck(
       id: 'plano_${now.microsecondsSinceEpoch}',
@@ -1291,13 +1151,10 @@ class MockSfaRepository extends ChangeNotifier {
       branchId: user.branchId,
       beforePhotoCaptured: beforePhotoCaptured,
       shelfArea: shelfArea,
-      shelfLevel: shelfLevel,
       ownProductRows: List.unmodifiable(ownProductRows),
       missingSkus: List.unmodifiable(missingSkus),
       competitorProductRows: List.unmodifiable(competitorProductRows),
-      shareOfShelfEstimate: shareOfShelfEstimate,
       mainIssue: mainIssue,
-      recommendedAction: recommendedAction,
       actionTaken: actionTaken,
       afterPhotoCaptured: afterPhotoCaptured,
       complianceStatus: complianceStatus,
@@ -1308,21 +1165,45 @@ class MockSfaRepository extends ChangeNotifier {
 
     _planogramChecks.add(check);
     final customer = getCustomerById(check.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: SyncItemType.planogramCheck,
-        referenceId: check.id,
-        title: 'Planogram Check',
-        description:
-            '${customer?.name ?? 'Customer'} ${check.complianceStatus.label}',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: SyncItemType.planogramCheck,
+      referenceId: check.id,
+      title: 'Planogram Check',
+      description:
+          '${customer?.name ?? 'Customer'} ${check.complianceStatus.label}',
+      now: now,
     );
 
     notifyListeners();
     return check;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stock Checks
+  // ---------------------------------------------------------------------------
+
+  List<StockCheck> getStockChecks() {
+    final user = _activeUser;
+    if (user == null) {
+      return const [];
+    }
+
+    final checks =
+        _stockChecks
+            .where((check) => check.employeeId == user.employeeId)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(checks);
+  }
+
+  StockCheck? getStockCheckById(String checkId) {
+    for (final check in _stockChecks) {
+      if (check.id == checkId) {
+        return check;
+      }
+    }
+    return null;
   }
 
   StockCheck? submitStockCheck({
@@ -1356,20 +1237,34 @@ class MockSfaRepository extends ChangeNotifier {
 
     _stockChecks.add(check);
     final customer = getCustomerById(check.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: SyncItemType.stockCheck,
-        referenceId: check.id,
-        title: 'Stock Check',
-        description: '${customer?.name ?? 'Customer'} ${items.length} products',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: SyncItemType.stockCheck,
+      referenceId: check.id,
+      title: 'Stock Check',
+      description: '${customer?.name ?? 'Customer'} ${items.length} products',
+      now: now,
     );
 
     notifyListeners();
     return check;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Visit Notes & Store Photos
+  // ---------------------------------------------------------------------------
+
+  List<VisitNote> getVisitNotesForVisit(String visitId) {
+    final notes = _visitNotes.where((note) => note.visitId == visitId).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(notes);
+  }
+
+  List<StorePhoto> getStorePhotosForVisit(String visitId) {
+    final photos =
+        _storePhotos.where((photo) => photo.visitId == visitId).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(photos);
   }
 
   VisitNote? saveVisitNote({
@@ -1401,16 +1296,13 @@ class MockSfaRepository extends ChangeNotifier {
 
     _visitNotes.add(note);
     final customer = getCustomerById(note.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: SyncItemType.visitNote,
-        referenceId: note.id,
-        title: 'Visit Note',
-        description: '${customer?.name ?? 'Customer'} ${result.label}',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: SyncItemType.visitNote,
+      referenceId: note.id,
+      title: 'Visit Note',
+      description: '${customer?.name ?? 'Customer'} ${result.label}',
+      now: now,
     );
 
     notifyListeners();
@@ -1444,21 +1336,22 @@ class MockSfaRepository extends ChangeNotifier {
 
     _storePhotos.add(photo);
     final customer = getCustomerById(photo.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: SyncItemType.storePhoto,
-        referenceId: photo.id,
-        title: 'Store Photo',
-        description: '${customer?.name ?? 'Customer'} ${photoType.label}',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: SyncItemType.storePhoto,
+      referenceId: photo.id,
+      title: 'Store Photo',
+      description: '${customer?.name ?? 'Customer'} ${photoType.label}',
+      now: now,
     );
 
     notifyListeners();
     return photo;
   }
+
+  // ---------------------------------------------------------------------------
+  // End Visit
+  // ---------------------------------------------------------------------------
 
   Visit? endActiveVisit() {
     final visit = activeVisit;
@@ -1483,21 +1376,346 @@ class MockSfaRepository extends ChangeNotifier {
     }
 
     final customer = getCustomerById(visit.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: SyncItemType.visitCheckOut,
-        referenceId: visit.id,
-        title: 'Visit Check-out',
-        description: customer?.name ?? 'Customer visit',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: SyncItemType.visitCheckOut,
+      referenceId: visit.id,
+      title: 'Visit Check-out',
+      description: customer?.name ?? 'Customer visit',
+      now: now,
     );
 
     notifyListeners();
     return completedVisit;
   }
+
+  // ---------------------------------------------------------------------------
+  // Sync
+  // ---------------------------------------------------------------------------
+
+  List<SyncItem> getSyncItems() {
+    final items = [..._syncItems]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return List.unmodifiable(items);
+  }
+
+  SyncItem? getSyncItemById(String syncItemId) {
+    for (final item in _syncItems) {
+      if (item.id == syncItemId) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  List<SyncEvent> getSyncEventsForItem(String syncItemId) {
+    return List.unmodifiable(_syncEvents[syncItemId] ?? const []);
+  }
+
+  SyncCenterSnapshot getSyncCenterSnapshot() {
+    return SyncCenterSnapshot(
+      pendingSync: _syncItems
+          .where(
+            (item) =>
+                item.status == SyncStatus.queued ||
+                item.status == SyncStatus.syncing,
+          )
+          .length,
+      syncedToday: _syncItems
+          .where(
+            (item) =>
+                item.status == SyncStatus.synced &&
+                item.syncedAt != null &&
+                _isSameDay(item.syncedAt!, DateTime.now()),
+          )
+          .length,
+      failedSync: _syncItems
+          .where((item) => item.status == SyncStatus.failed)
+          .length,
+      lastSyncAt: _lastSyncAt,
+    );
+  }
+
+  Future<int> syncQueuedItems() async {
+    final indexes = <int>[];
+    for (var index = 0; index < _syncItems.length; index += 1) {
+      if (_syncItems[index].status == SyncStatus.queued) {
+        indexes.add(index);
+        final now = DateTime.now();
+        _syncItems[index] = _syncItems[index].copyWith(
+          status: SyncStatus.syncing,
+          syncingAt: now,
+          lastAttemptAt: now,
+          clearErrorMessage: true,
+        );
+        _addSyncEvent(
+          _syncItems[index].id,
+          SyncEventType.syncStarted,
+          'Sync started',
+          now,
+        );
+      }
+    }
+
+    if (indexes.isEmpty) {
+      return 0;
+    }
+
+    notifyListeners();
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+
+    final now = DateTime.now();
+    for (final index in indexes) {
+      if (_syncItems[index].status == SyncStatus.syncing) {
+        _syncItems[index] = _syncItems[index].copyWith(
+          status: SyncStatus.synced,
+          syncedAt: now,
+          attemptCount: _syncItems[index].attemptCount + 1,
+          clearErrorMessage: true,
+        );
+        _addSyncEvent(
+          _syncItems[index].id,
+          SyncEventType.sentToServer,
+          'Sent to server',
+          now,
+        );
+        _addSyncEvent(
+          _syncItems[index].id,
+          SyncEventType.syncSuccess,
+          'Sync successful',
+          now,
+        );
+      }
+    }
+    _lastSyncAt = now;
+    notifyListeners();
+    return indexes.length;
+  }
+
+  Future<int> retryFailedSyncItems() async {
+    final indexes = <int>[];
+    for (var index = 0; index < _syncItems.length; index += 1) {
+      if (_syncItems[index].status == SyncStatus.failed) {
+        indexes.add(index);
+        final now = DateTime.now();
+        _syncItems[index] = _syncItems[index].copyWith(
+          status: SyncStatus.syncing,
+          syncingAt: now,
+          lastAttemptAt: now,
+          clearErrorMessage: true,
+        );
+        _addSyncEvent(
+          _syncItems[index].id,
+          SyncEventType.retryStarted,
+          'Retry started',
+          now,
+        );
+      }
+    }
+
+    if (indexes.isEmpty) {
+      return 0;
+    }
+
+    notifyListeners();
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+
+    final now = DateTime.now();
+    for (final index in indexes) {
+      if (_syncItems[index].status == SyncStatus.syncing) {
+        _syncItems[index] = _syncItems[index].copyWith(
+          status: SyncStatus.synced,
+          syncedAt: now,
+          attemptCount: _syncItems[index].attemptCount + 1,
+          clearErrorMessage: true,
+        );
+        _addSyncEvent(
+          _syncItems[index].id,
+          SyncEventType.sentToServer,
+          'Sent to server',
+          now,
+        );
+        _addSyncEvent(
+          _syncItems[index].id,
+          SyncEventType.syncSuccess,
+          'Sync successful',
+          now,
+        );
+      }
+    }
+    _lastSyncAt = now;
+    notifyListeners();
+    return indexes.length;
+  }
+
+  Future<bool> retrySyncItem(String syncItemId) async {
+    final index = _syncItems.indexWhere((item) => item.id == syncItemId);
+    if (index < 0 || _syncItems[index].status != SyncStatus.failed) {
+      return false;
+    }
+
+    final now = DateTime.now();
+    _syncItems[index] = _syncItems[index].copyWith(
+      status: SyncStatus.syncing,
+      syncingAt: now,
+      lastAttemptAt: now,
+      clearErrorMessage: true,
+    );
+    _addSyncEvent(syncItemId, SyncEventType.retryStarted, 'Retry started', now);
+    notifyListeners();
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+
+    final synced = DateTime.now();
+    if (_syncItems[index].status == SyncStatus.syncing) {
+      _syncItems[index] = _syncItems[index].copyWith(
+        status: SyncStatus.synced,
+        syncedAt: synced,
+        attemptCount: _syncItems[index].attemptCount + 1,
+        clearErrorMessage: true,
+      );
+      _addSyncEvent(
+        syncItemId,
+        SyncEventType.sentToServer,
+        'Sent to server',
+        synced,
+      );
+      _addSyncEvent(
+        syncItemId,
+        SyncEventType.syncSuccess,
+        'Sync successful',
+        synced,
+      );
+    }
+    _lastSyncAt = synced;
+    notifyListeners();
+    return true;
+  }
+
+  bool cancelQueuedSyncItem(String syncItemId) {
+    final index = _syncItems.indexWhere((item) => item.id == syncItemId);
+    if (index < 0 || _syncItems[index].status != SyncStatus.queued) {
+      return false;
+    }
+    final now = DateTime.now();
+    _syncItems[index] = _syncItems[index].copyWith(
+      status: SyncStatus.cancelled,
+      errorMessage: 'Cancelled locally. Transaction data was kept.',
+    );
+    _addSyncEvent(
+      syncItemId,
+      SyncEventType.cancelled,
+      'Cancelled by user',
+      now,
+    );
+    notifyListeners();
+    return true;
+  }
+
+  bool simulateFailedSync() {
+    final index = _syncItems.indexWhere(
+      (item) => item.status == SyncStatus.queued,
+    );
+    if (index < 0) {
+      return false;
+    }
+    final now = DateTime.now();
+    _syncItems[index] = _syncItems[index].copyWith(
+      status: SyncStatus.failed,
+      lastAttemptAt: now,
+      attemptCount: _syncItems[index].attemptCount + 1,
+      errorMessage: 'Network timeout. Please retry.',
+    );
+    _addSyncEvent(
+      _syncItems[index].id,
+      SyncEventType.syncFailed,
+      'Network timeout',
+      now,
+    );
+    notifyListeners();
+    return true;
+  }
+
+  bool clearSyncedSyncItems() {
+    final before = _syncItems.length;
+    final removedIds = _syncItems
+        .where((item) => item.status == SyncStatus.synced)
+        .map((item) => item.id)
+        .toList();
+    _syncItems.removeWhere((item) => item.status == SyncStatus.synced);
+    for (final id in removedIds) {
+      _syncEvents.remove(id);
+    }
+    if (_syncItems.length == before) {
+      return false;
+    }
+    notifyListeners();
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Visit Summary
+  // ---------------------------------------------------------------------------
+
+  VisitSummarySnapshot getVisitSummary(String visitId) {
+    final notes = getVisitNotesForVisit(visitId);
+    final regularOrders = _salesOrders
+        .where(
+          (order) =>
+              order.visitId == visitId &&
+              order.orderType == SalesOrderType.regular,
+        )
+        .length;
+    final canvasOrders = _salesOrders
+        .where(
+          (order) =>
+              order.visitId == visitId &&
+              order.orderType == SalesOrderType.canvas,
+        )
+        .length;
+
+    return VisitSummarySnapshot(
+      regularOrderCount: regularOrders,
+      canvasOrderCount: canvasOrders,
+      salesOrderCount: regularOrders + canvasOrders,
+      returnOrderCount: _returnOrders
+          .where((returnOrder) => returnOrder.visitId == visitId)
+          .length,
+      promoCheckCount: _promoChecks
+          .where((promoCheck) => promoCheck.visitId == visitId)
+          .length,
+      competitorActivityCount: _competitorActivities
+          .where((activity) => activity.visitId == visitId)
+          .length,
+      planogramCheckCount: _planogramChecks
+          .where((check) => check.visitId == visitId)
+          .length,
+      stockCheckCount: _stockChecks
+          .where((check) => check.visitId == visitId)
+          .length,
+      storePhotoCount: _storePhotos
+          .where((photo) => photo.visitId == visitId)
+          .length,
+      visitNoteCount: notes.length,
+      pendingSyncCount: getPendingSyncCountForVisit(visitId),
+      latestVisitNote: notes.isEmpty ? null : notes.first,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Discount
+  // ---------------------------------------------------------------------------
+
+  int calculateDiscount({required int subtotal, required int totalQuantity}) {
+    final fixedDiscount = subtotal >= 500000 ? 25000 : 0;
+    final quantityDiscount = totalQuantity >= 10
+        ? (subtotal * 0.05).round()
+        : 0;
+    return fixedDiscount > quantityDiscount ? fixedDiscount : quantityDiscount;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
 
   ReturnOrder? _createReturnOrder({
     required ReturnOrderType returnType,
@@ -1535,30 +1753,63 @@ class MockSfaRepository extends ChangeNotifier {
 
     _returnOrders.add(returnOrder);
     final customer = getCustomerById(returnOrder.customerId);
-    _syncItems.add(
-      SyncItem(
-        id: 'sync_${now.microsecondsSinceEpoch}',
-        type: returnType == ReturnOrderType.returnOrder
-            ? SyncItemType.returnOrder
-            : SyncItemType.returnSwapOrder,
-        referenceId: returnOrder.id,
-        title: returnType.label,
-        description: '${customer?.name ?? 'Customer'} $reason',
-        status: SyncStatus.queued,
-        createdAt: now,
-      ),
+    _createSyncItem(
+      id: 'sync_${now.microsecondsSinceEpoch}',
+      type: returnType == ReturnOrderType.returnOrder
+          ? SyncItemType.returnOrder
+          : SyncItemType.returnSwapOrder,
+      referenceId: returnOrder.id,
+      title: returnType.label,
+      description: '${customer?.name ?? 'Customer'} $reason',
+      now: now,
     );
 
     notifyListeners();
     return returnOrder;
   }
 
-  int calculateDiscount({required int subtotal, required int totalQuantity}) {
-    final fixedDiscount = subtotal >= 500000 ? 25000 : 0;
-    final quantityDiscount = totalQuantity >= 10
-        ? (subtotal * 0.05).round()
-        : 0;
-    return fixedDiscount > quantityDiscount ? fixedDiscount : quantityDiscount;
+  void _createSyncItem({
+    required String id,
+    required SyncItemType type,
+    required String referenceId,
+    required String title,
+    required String description,
+    required DateTime now,
+  }) {
+    final item = SyncItem(
+      id: id,
+      type: type,
+      referenceId: referenceId,
+      title: title,
+      description: description,
+      status: SyncStatus.queued,
+      createdAt: now,
+      queuedAt: now,
+    );
+    _syncItems.add(item);
+    _syncEvents[id] = [
+      SyncEvent(
+        eventType: SyncEventType.createdOnDevice,
+        timestamp: now,
+        message: 'Created on device',
+      ),
+      SyncEvent(
+        eventType: SyncEventType.queued,
+        timestamp: now,
+        message: 'Queued for sync',
+      ),
+    ];
+  }
+
+  void _addSyncEvent(
+    String syncItemId,
+    SyncEventType eventType,
+    String message,
+    DateTime timestamp,
+  ) {
+    _syncEvents.putIfAbsent(syncItemId, () => []).add(
+      SyncEvent(eventType: eventType, timestamp: timestamp, message: message),
+    );
   }
 
   void _ensureCanvasStock() {

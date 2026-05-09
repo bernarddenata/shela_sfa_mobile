@@ -6,7 +6,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatters.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/sales_order.dart';
+import '../../../data/models/uom.dart';
 import '../../../data/repositories/app_state_scope.dart';
+import '../../../data/repositories/mock_sfa_repository.dart';
 
 class OrderEntryPage extends StatefulWidget {
   const OrderEntryPage({required this.orderType, super.key});
@@ -20,6 +22,7 @@ class OrderEntryPage extends StatefulWidget {
 class _OrderEntryPageState extends State<OrderEntryPage> {
   final _searchController = TextEditingController();
   final Map<String, int> _quantities = {};
+  final Map<String, String> _selectedUomIds = {};
   String _query = '';
 
   @override
@@ -37,6 +40,9 @@ class _OrderEntryPageState extends State<OrderEntryPage> {
     _searchController.dispose();
     super.dispose();
   }
+
+  String _uomIdFor(Product product) =>
+      _selectedUomIds[product.id] ?? product.baseUomId;
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +64,7 @@ class _OrderEntryPageState extends State<OrderEntryPage> {
     final products = repository
         .getOwnSellableProducts()
         .where((product) {
-          if (_query.isEmpty) {
-            return true;
-          }
+          if (_query.isEmpty) return true;
           return product.name.toLowerCase().contains(_query) ||
               product.sku.toLowerCase().contains(_query);
         })
@@ -78,9 +82,7 @@ class _OrderEntryPageState extends State<OrderEntryPage> {
       0,
       (total, quantity) => total + quantity,
     );
-    final itemCount = _quantities.values
-        .where((quantity) => quantity > 0)
-        .length;
+    final itemCount = _quantities.values.where((q) => q > 0).length;
     final discount = repository.calculateDiscount(
       subtotal: subtotal,
       totalQuantity: totalQuantity,
@@ -167,7 +169,11 @@ class _OrderEntryPageState extends State<OrderEntryPage> {
                   child: _ProductOrderCard(
                     product: product,
                     orderType: widget.orderType,
+                    availableUoms: repository.getUomsForProduct(product),
+                    selectedUomId: _uomIdFor(product),
                     quantity: _quantities[product.id] ?? 0,
+                    onUomChanged: (uomId) =>
+                        setState(() => _selectedUomIds[product.id] = uomId),
                     onChanged: (quantity) => _setQuantity(product, quantity),
                   ),
                 ),
@@ -208,9 +214,22 @@ class _OrderEntryPageState extends State<OrderEntryPage> {
       return;
     }
 
-    final order = AppStateScope.of(context).submitSalesOrder(
+    final repository = AppStateScope.of(context);
+    final lineItems = _quantities.entries.map((entry) {
+      final product = repository.getProductById(entry.key)!;
+      final uomId = _uomIdFor(product);
+      final uom = repository.getUomById(uomId);
+      return OrderLineInput(
+        productId: entry.key,
+        uomId: uomId,
+        uomCode: uom?.code ?? 'PCS',
+        quantity: entry.value,
+      );
+    }).toList();
+
+    final order = repository.submitSalesOrder(
       orderType: widget.orderType,
-      quantitiesByProductId: Map.unmodifiable(_quantities),
+      lineItems: lineItems,
     );
 
     if (order == null) {
@@ -228,13 +247,19 @@ class _ProductOrderCard extends StatelessWidget {
   const _ProductOrderCard({
     required this.product,
     required this.orderType,
+    required this.availableUoms,
+    required this.selectedUomId,
     required this.quantity,
+    required this.onUomChanged,
     required this.onChanged,
   });
 
   final Product product;
   final SalesOrderType orderType;
+  final List<Uom> availableUoms;
+  final String selectedUomId;
   final int quantity;
+  final ValueChanged<String> onUomChanged;
   final ValueChanged<int> onChanged;
 
   @override
@@ -288,6 +313,38 @@ class _ProductOrderCard extends StatelessWidget {
                       ? AppTheme.accent
                       : AppTheme.danger,
                   fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+            if (availableUoms.length > 1) ...[
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: selectedUomId,
+                decoration: const InputDecoration(
+                  labelText: 'Unit',
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                items: availableUoms
+                    .map(
+                      (uom) => DropdownMenuItem(
+                        value: uom.id,
+                        child: Text(uom.code),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) onUomChanged(value);
+                },
+              ),
+            ] else if (availableUoms.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Unit: ${availableUoms.first.code}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF6B7280),
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],

@@ -114,11 +114,15 @@ class PlanogramOwnProductRow {
     required this.facingCount,
     required this.availability,
     required this.placementStatus,
+    this.uomId = 'uom_pcs',
+    this.uomCode = 'PCS',
   });
 
   final String productId;
   final String productName;
   final String sku;
+  final String uomId;
+  final String uomCode;
   final int facingCount;
   final ProductAvailability availability;
   final ProductPlacementStatus placementStatus;
@@ -131,6 +135,8 @@ class PlanogramCompetitorProductRow {
     required this.productId,
     required this.productName,
     required this.facingCount,
+    this.uomId = 'uom_pcs',
+    this.uomCode = 'PCS',
     this.shelfDominanceNote = '',
   });
 
@@ -138,6 +144,8 @@ class PlanogramCompetitorProductRow {
   final String brandName;
   final String productId;
   final String productName;
+  final String uomId;
+  final String uomCode;
   final int facingCount;
   final String shelfDominanceNote;
 }
@@ -151,18 +159,18 @@ class PlanogramCheck {
     required this.branchId,
     required this.beforePhotoCaptured,
     required this.shelfArea,
-    required this.shelfLevel,
     required this.ownProductRows,
     required this.missingSkus,
     required this.competitorProductRows,
-    required this.shareOfShelfEstimate,
     required this.mainIssue,
-    required this.recommendedAction,
     required this.actionTaken,
     required this.afterPhotoCaptured,
     required this.complianceStatus,
     required this.syncStatus,
     required this.createdAt,
+    this.shelfLevel = ShelfLevel.middleLevel,
+    this.shareOfShelfEstimate = ShareOfShelfEstimate.balanced,
+    this.recommendedAction = RecommendedAction.noAction,
     this.notes = '',
   });
 

@@ -40,7 +40,11 @@ class SyncItem {
     required this.description,
     required this.status,
     required this.createdAt,
+    this.queuedAt,
+    this.syncingAt,
     this.syncedAt,
+    this.lastAttemptAt,
+    this.attemptCount = 0,
     this.errorMessage,
   });
 
@@ -51,12 +55,20 @@ class SyncItem {
   final String description;
   final SyncStatus status;
   final DateTime createdAt;
+  final DateTime? queuedAt;
+  final DateTime? syncingAt;
   final DateTime? syncedAt;
+  final DateTime? lastAttemptAt;
+  final int attemptCount;
   final String? errorMessage;
 
   SyncItem copyWith({
     SyncStatus? status,
+    DateTime? queuedAt,
+    DateTime? syncingAt,
     DateTime? syncedAt,
+    DateTime? lastAttemptAt,
+    int? attemptCount,
     String? errorMessage,
     bool clearErrorMessage = false,
   }) {
@@ -68,10 +80,12 @@ class SyncItem {
       description: description,
       status: status ?? this.status,
       createdAt: createdAt,
+      queuedAt: queuedAt ?? this.queuedAt,
+      syncingAt: syncingAt ?? this.syncingAt,
       syncedAt: syncedAt ?? this.syncedAt,
-      errorMessage: clearErrorMessage
-          ? null
-          : errorMessage ?? this.errorMessage,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      attemptCount: attemptCount ?? this.attemptCount,
+      errorMessage: clearErrorMessage ? null : errorMessage ?? this.errorMessage,
     );
   }
 }

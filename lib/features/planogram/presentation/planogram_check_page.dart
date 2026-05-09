@@ -22,10 +22,7 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
   bool _beforePhotoCaptured = false;
   bool _afterPhotoCaptured = false;
   ShelfArea? _shelfArea;
-  ShelfLevel? _shelfLevel;
-  ShareOfShelfEstimate? _shareOfShelfEstimate;
   PlanogramMainIssue? _mainIssue;
-  RecommendedAction? _recommendedAction;
   MerchandiserActionTaken? _actionTaken;
   PlanogramComplianceStatus? _complianceStatus;
 
@@ -45,18 +42,22 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
       _actionTaken != null &&
       _actionTaken != MerchandiserActionTaken.noActionTaken;
 
+  bool get _notesRequiredForNoAction =>
+      _actionTaken == MerchandiserActionTaken.noActionTaken &&
+      _mainIssue != null &&
+      _mainIssue != PlanogramMainIssue.noIssue;
+
   bool get _canSubmit =>
       _beforePhotoCaptured &&
       _shelfArea != null &&
-      _shelfLevel != null &&
       _ownRows.isNotEmpty &&
       _ownRows.every((row) => row.isComplete) &&
-      _shareOfShelfEstimate != null &&
       _mainIssue != null &&
-      _recommendedAction != null &&
       _actionTaken != null &&
       _complianceStatus != null &&
-      (!_requiresAfterPhoto || _afterPhotoCaptured);
+      (!_requiresAfterPhoto || _afterPhotoCaptured) &&
+      (!_notesRequiredForNoAction ||
+          _notesController.text.trim().isNotEmpty);
 
   @override
   Widget build(BuildContext context) {
@@ -110,24 +111,12 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
             ),
             _SectionCard(
               title: '3. Shelf Location',
-              child: Column(
-                children: [
-                  _EnumDropdown<ShelfArea>(
-                    label: 'Shelf Area',
-                    value: _shelfArea,
-                    values: ShelfArea.values,
-                    labelOf: (value) => value.label,
-                    onChanged: (value) => setState(() => _shelfArea = value),
-                  ),
-                  const SizedBox(height: 12),
-                  _EnumDropdown<ShelfLevel>(
-                    label: 'Shelf Level',
-                    value: _shelfLevel,
-                    values: ShelfLevel.values,
-                    labelOf: (value) => value.label,
-                    onChanged: (value) => setState(() => _shelfLevel = value),
-                  ),
-                ],
+              child: _EnumDropdown<ShelfArea>(
+                label: 'Shelf Area',
+                value: _shelfArea,
+                values: ShelfArea.values,
+                labelOf: (value) => value.label,
+                onChanged: (value) => setState(() => _shelfArea = value),
               ),
             ),
             _SectionCard(
@@ -202,35 +191,13 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
               ),
             ),
             _SectionCard(
-              title: '7. Shelf Analysis',
-              child: Column(
-                children: [
-                  _EnumDropdown<ShareOfShelfEstimate>(
-                    label: 'Share of Shelf Estimate',
-                    value: _shareOfShelfEstimate,
-                    values: ShareOfShelfEstimate.values,
-                    labelOf: (value) => value.label,
-                    onChanged: (value) =>
-                        setState(() => _shareOfShelfEstimate = value),
-                  ),
-                  const SizedBox(height: 12),
-                  _EnumDropdown<PlanogramMainIssue>(
-                    label: 'Main Issue',
-                    value: _mainIssue,
-                    values: PlanogramMainIssue.values,
-                    labelOf: (value) => value.label,
-                    onChanged: (value) => setState(() => _mainIssue = value),
-                  ),
-                  const SizedBox(height: 12),
-                  _EnumDropdown<RecommendedAction>(
-                    label: 'Recommended Action',
-                    value: _recommendedAction,
-                    values: RecommendedAction.values,
-                    labelOf: (value) => value.label,
-                    onChanged: (value) =>
-                        setState(() => _recommendedAction = value),
-                  ),
-                ],
+              title: '7. Shelf Issue',
+              child: _EnumDropdown<PlanogramMainIssue>(
+                label: 'Main Issue',
+                value: _mainIssue,
+                values: PlanogramMainIssue.values,
+                labelOf: (value) => value.label,
+                onChanged: (value) => setState(() => _mainIssue = value),
               ),
             ),
             _SectionCard(
@@ -254,7 +221,7 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
               ),
             ),
             _SectionCard(
-              title: '10. Compliance Status',
+              title: '10. Compliance & Notes',
               child: Column(
                 children: [
                   _EnumDropdown<PlanogramComplianceStatus>(
@@ -269,7 +236,16 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
                   TextField(
                     controller: _notesController,
                     maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Notes'),
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: _notesRequiredForNoAction
+                          ? 'Notes (required — no action taken on identified issue)'
+                          : 'Notes',
+                      errorText: _notesRequiredForNoAction &&
+                              _notesController.text.trim().isEmpty
+                          ? 'Notes required when no action taken on issue'
+                          : null,
+                    ),
                   ),
                 ],
               ),
@@ -309,28 +285,20 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
       _showMessage('Please select shelf area.');
       return;
     }
-    if (_shelfLevel == null) {
-      _showMessage('Please select shelf level.');
-      return;
-    }
     if (_ownRows.isEmpty || !_ownRows.every((row) => row.isComplete)) {
       _showMessage('Please add at least one complete own product row.');
-      return;
-    }
-    if (_shareOfShelfEstimate == null) {
-      _showMessage('Please select share of shelf estimate.');
       return;
     }
     if (_mainIssue == null) {
       _showMessage('Please select main issue.');
       return;
     }
-    if (_recommendedAction == null) {
-      _showMessage('Please select recommended action.');
-      return;
-    }
     if (_actionTaken == null) {
       _showMessage('Please select action taken.');
+      return;
+    }
+    if (_notesRequiredForNoAction && _notesController.text.trim().isEmpty) {
+      _showMessage('Notes required when no action taken on identified issue.');
       return;
     }
     if (_complianceStatus == null) {
@@ -359,12 +327,9 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
     final check = AppStateScope.of(context).submitPlanogramCheck(
       beforePhotoCaptured: _beforePhotoCaptured,
       shelfArea: _shelfArea!,
-      shelfLevel: _shelfLevel!,
       ownProductRows: ownRows,
       competitorProductRows: competitorRows,
-      shareOfShelfEstimate: _shareOfShelfEstimate!,
       mainIssue: _mainIssue!,
-      recommendedAction: _recommendedAction!,
       actionTaken: _actionTaken!,
       afterPhotoCaptured: _afterPhotoCaptured,
       complianceStatus: _complianceStatus!,

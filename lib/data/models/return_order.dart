@@ -16,11 +16,15 @@ class ReturnOrderItem {
     required this.productName,
     required this.sku,
     required this.quantity,
+    this.uomId = 'uom_pcs',
+    this.uomCode = 'PCS',
   });
 
   final String productId;
   final String productName;
   final String sku;
+  final String uomId;
+  final String uomCode;
   final int quantity;
 }
 

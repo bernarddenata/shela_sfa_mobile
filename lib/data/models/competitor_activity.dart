@@ -7,7 +7,11 @@ enum CompetitorActivityType {
   freeGift('FREE_GIFT'),
   priceCut('PRICE_CUT'),
   displayPromo('DISPLAY_PROMO'),
-  newProduct('NEW_PRODUCT');
+  newProduct('NEW_PRODUCT'),
+  priceIncrease('PRICE_INCREASE'),
+  priceDecrease('PRICE_DECREASE'),
+  newPackaging('NEW_PACKAGING'),
+  stockDominance('STOCK_DOMINANCE');
 
   const CompetitorActivityType(this.label);
 
