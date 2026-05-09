@@ -76,12 +76,14 @@ class SalesOrderMenuPage extends StatelessWidget {
             const SizedBox(height: 10),
             MenuTile(
               title: 'Draft Order',
-              subtitle: 'Draft order list will be added later',
+              subtitle: 'Draft order list will be completed in a later version',
               icon: Icons.drafts_outlined,
               color: AppTheme.primary,
               onTap: () => ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Draft Order will be implemented later.'),
+                  content: Text(
+                    'Draft Order will be completed in a later version.',
+                  ),
                 ),
               ),
             ),

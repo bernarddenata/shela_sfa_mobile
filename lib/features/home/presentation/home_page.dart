@@ -257,7 +257,7 @@ class HomePage extends StatelessWidget {
 
   static void _showPhaseMessage(BuildContext context, String title) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$title will be implemented in a later phase.')),
+      SnackBar(content: Text('$title will be completed in a later version.')),
     );
   }
 }

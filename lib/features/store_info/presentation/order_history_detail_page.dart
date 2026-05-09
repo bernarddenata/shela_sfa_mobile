@@ -129,7 +129,7 @@ class OrderHistoryDetailPage extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Repeat Order will be implemented later.'),
+                  content: Text('Repeat Order will be connected later.'),
                 ),
               ),
               icon: const Icon(Icons.repeat),

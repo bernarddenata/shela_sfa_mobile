@@ -208,7 +208,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Prototype mode uses local dummy data only.',
+                      'Prototype mode uses local offline-ready sample data.',
                       style: textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF4B5563),
                         fontWeight: FontWeight.w600,

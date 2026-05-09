@@ -56,8 +56,7 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
       _actionTaken != null &&
       _complianceStatus != null &&
       (!_requiresAfterPhoto || _afterPhotoCaptured) &&
-      (!_notesRequiredForNoAction ||
-          _notesController.text.trim().isNotEmpty);
+      (!_notesRequiredForNoAction || _notesController.text.trim().isNotEmpty);
 
   @override
   Widget build(BuildContext context) {
@@ -241,7 +240,8 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
                       labelText: _notesRequiredForNoAction
                           ? 'Notes (required — no action taken on identified issue)'
                           : 'Notes',
-                      errorText: _notesRequiredForNoAction &&
+                      errorText:
+                          _notesRequiredForNoAction &&
                               _notesController.text.trim().isEmpty
                           ? 'Notes required when no action taken on issue'
                           : null,
@@ -307,6 +307,19 @@ class _PlanogramCheckPageState extends State<PlanogramCheckPage> {
     }
     if (_requiresAfterPhoto && !_afterPhotoCaptured) {
       _showMessage('Please capture after shelf photo.');
+      return;
+    }
+    final competitorRowsWithInput = _competitorRows.where(
+      (row) =>
+          row.brand != null ||
+          row.product != null ||
+          row.facingController.text.trim().isNotEmpty ||
+          row.noteController.text.trim().isNotEmpty,
+    );
+    if (competitorRowsWithInput.any((row) => !row.isComplete)) {
+      _showMessage(
+        'Please complete or remove incomplete competitor product rows.',
+      );
       return;
     }
 

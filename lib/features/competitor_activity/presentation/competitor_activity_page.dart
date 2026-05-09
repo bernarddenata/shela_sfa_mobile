@@ -234,11 +234,11 @@ class _CompetitorActivityPageState extends State<CompetitorActivityPage> {
 
   void _submit() {
     if (_selectedBrand == null) {
-      _showMessage('Please enter competitor brand.');
+      _showMessage('Please select competitor brand.');
       return;
     }
     if (_selectedProduct == null) {
-      _showMessage('Please enter competitor product.');
+      _showMessage('Please select competitor product.');
       return;
     }
     if (_activityType == null) {
