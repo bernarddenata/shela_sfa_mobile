@@ -112,17 +112,32 @@ class _SyncCenterPageState extends State<SyncCenterPage> {
                   icon: const Icon(Icons.refresh_outlined),
                   label: const Text('Retry Failed'),
                 ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _simulateFailed,
-                  icon: const Icon(Icons.bug_report_outlined),
-                  label: const Text('Simulate Failed Sync'),
-                ),
                 if (allItems.any((item) => item.status == SyncStatus.synced))
                   OutlinedButton.icon(
                     onPressed: _busy ? null : _clearSynced,
                     icon: const Icon(Icons.clear_all),
                     label: const Text('Clear Synced'),
                   ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              title: const Text(
+                'Demo tools',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: const Text('Use only for manual review scenarios.'),
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _simulateFailed,
+                    icon: const Icon(Icons.bug_report_outlined),
+                    label: const Text('Simulate Failed Sync'),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 18),

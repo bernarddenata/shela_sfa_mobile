@@ -157,8 +157,10 @@ class MockSfaRepository extends ChangeNotifier {
   final List<Brand> _mockBrands = [];
   final List<Product> _mockProducts = [];
   final Map<String, int> _canvasStockByProductId = {};
+  Visit? _lastCompletedVisit;
 
   UserContext? get activeUser => _activeUser;
+  Visit? get lastCompletedVisit => _lastCompletedVisit;
 
   Visit? get activeVisit {
     for (final visit in _visits.reversed) {
@@ -210,6 +212,7 @@ class MockSfaRepository extends ChangeNotifier {
     _mockBrands.clear();
     _mockProducts.clear();
     _canvasStockByProductId.clear();
+    _lastCompletedVisit = null;
     notifyListeners();
   }
 
@@ -1370,6 +1373,7 @@ class MockSfaRepository extends ChangeNotifier {
     }
 
     _visits[visitIndex] = completedVisit;
+    _lastCompletedVisit = completedVisit;
     final callPlan = getCallPlanById(visit.callPlanId);
     if (callPlan != null) {
       _replaceCallPlan(callPlan.copyWith(status: CallPlanStatus.completed));
@@ -1807,9 +1811,15 @@ class MockSfaRepository extends ChangeNotifier {
     String message,
     DateTime timestamp,
   ) {
-    _syncEvents.putIfAbsent(syncItemId, () => []).add(
-      SyncEvent(eventType: eventType, timestamp: timestamp, message: message),
-    );
+    _syncEvents
+        .putIfAbsent(syncItemId, () => [])
+        .add(
+          SyncEvent(
+            eventType: eventType,
+            timestamp: timestamp,
+            message: message,
+          ),
+        );
   }
 
   void _ensureCanvasStock() {

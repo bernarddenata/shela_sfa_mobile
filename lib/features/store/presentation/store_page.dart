@@ -29,127 +29,149 @@ class StorePage extends StatelessWidget {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Store Page')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            _StoreHeader(
-              visit: visit,
-              customerName: customer.name,
-              customerAddress: customer.address,
-              pendingSyncCount: repository.getPendingSyncCountForVisit(
-                visit.id,
-              ),
-            ),
-            const SizedBox(height: 18),
-            _MenuSection(
-              title: 'Primary Sales',
-              children: [
-                MenuTile(
-                  title: 'Sales / Order',
-                  subtitle: 'Create store order',
-                  icon: Icons.shopping_cart_outlined,
-                  color: AppTheme.accent,
-                  isProminent: true,
-                  onTap: () => context.push(AppRoutes.salesOrderMenu),
-                ),
-                MenuTile(
-                  title: 'Return',
-                  subtitle: 'Record product returns',
-                  icon: Icons.assignment_return_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.returnMenu),
-                ),
-              ],
-            ),
-            _MenuSection(
-              title: 'Retail Execution',
-              children: [
-                MenuTile(
-                  title: 'Promo Check',
-                  subtitle: 'Check promo execution',
-                  icon: Icons.local_offer_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.promoCheck),
-                ),
-                MenuTile(
-                  title: 'Competitor Activity',
-                  subtitle: 'Record competitor activity',
-                  icon: Icons.compare_arrows_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.competitorActivity),
-                ),
-                MenuTile(
-                  title: 'Planogram / Shelf Check',
-                  subtitle: 'Review shelf compliance',
-                  icon: Icons.view_column_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.planogramCheck),
-                ),
-                MenuTile(
-                  title: 'Stock Check',
-                  subtitle: 'Record store stock',
-                  icon: Icons.inventory_2_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.stockCheck),
-                ),
-              ],
-            ),
-            _MenuSection(
-              title: 'Store Information',
-              children: [
-                MenuTile(
-                  title: 'Product & Price List',
-                  subtitle: 'Browse local catalog',
-                  icon: Icons.price_check_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.productPriceList),
-                ),
-                MenuTile(
-                  title: 'Order History',
-                  subtitle: 'Review customer orders',
-                  icon: Icons.history_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.orderHistory),
-                ),
-                MenuTile(
-                  title: 'Customer Info',
-                  subtitle: 'View customer details',
-                  icon: Icons.store_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.customerInfo),
-                ),
-              ],
-            ),
-            _MenuSection(
-              title: 'Visit Completion',
-              children: [
-                MenuTile(
-                  title: 'Visit Notes',
-                  subtitle: 'Write visit result notes',
-                  icon: Icons.note_alt_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.visitNotes),
-                ),
-                MenuTile(
-                  title: 'Store Photo',
-                  subtitle: 'Capture visit photos',
-                  icon: Icons.photo_camera_outlined,
-                  color: AppTheme.primary,
-                  onTap: () => context.push(AppRoutes.storePhoto),
-                ),
-                MenuTile(
-                  title: 'End Visit',
-                  subtitle: 'Complete active visit',
-                  icon: Icons.logout_outlined,
-                  color: AppTheme.danger,
-                  onTap: () => context.push(AppRoutes.endVisit),
-                ),
-              ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          context.go(AppRoutes.visit);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Store Visit'),
+          leading: IconButton(
+            tooltip: 'Back to Visit Plan',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go(AppRoutes.visit),
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'Go to Home',
+              icon: const Icon(Icons.home_outlined),
+              onPressed: () => context.go(AppRoutes.home),
             ),
           ],
+        ),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              _StoreHeader(
+                visit: visit,
+                customerName: customer.name,
+                customerAddress: customer.address,
+                pendingSyncCount: repository.getPendingSyncCountForVisit(
+                  visit.id,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _MenuSection(
+                title: 'Primary Sales',
+                children: [
+                  MenuTile(
+                    title: 'Sales / Order',
+                    subtitle: 'Create store order',
+                    icon: Icons.shopping_cart_outlined,
+                    color: AppTheme.accent,
+                    isProminent: true,
+                    onTap: () => context.push(AppRoutes.salesOrderMenu),
+                  ),
+                  MenuTile(
+                    title: 'Return',
+                    subtitle: 'Record product returns',
+                    icon: Icons.assignment_return_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.returnMenu),
+                  ),
+                ],
+              ),
+              _MenuSection(
+                title: 'Retail Execution',
+                children: [
+                  MenuTile(
+                    title: 'Promo Check',
+                    subtitle: 'Check promo execution',
+                    icon: Icons.local_offer_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.promoCheck),
+                  ),
+                  MenuTile(
+                    title: 'Competitor Activity',
+                    subtitle: 'Record competitor activity',
+                    icon: Icons.compare_arrows_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.competitorActivity),
+                  ),
+                  MenuTile(
+                    title: 'Planogram / Shelf Check',
+                    subtitle: 'Review shelf compliance',
+                    icon: Icons.view_column_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.planogramCheck),
+                  ),
+                  MenuTile(
+                    title: 'Stock Check',
+                    subtitle: 'Record store stock',
+                    icon: Icons.inventory_2_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.stockCheck),
+                  ),
+                ],
+              ),
+              _MenuSection(
+                title: 'Store Information',
+                children: [
+                  MenuTile(
+                    title: 'Product & Price List',
+                    subtitle: 'Browse local catalog',
+                    icon: Icons.price_check_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.productPriceList),
+                  ),
+                  MenuTile(
+                    title: 'Order History',
+                    subtitle: 'Review customer orders',
+                    icon: Icons.history_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.orderHistory),
+                  ),
+                  MenuTile(
+                    title: 'Customer Info',
+                    subtitle: 'View customer details',
+                    icon: Icons.store_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.customerInfo),
+                  ),
+                ],
+              ),
+              _MenuSection(
+                title: 'Visit Completion',
+                children: [
+                  MenuTile(
+                    title: 'Visit Notes',
+                    subtitle: 'Write visit result notes',
+                    icon: Icons.note_alt_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.visitNotes),
+                  ),
+                  MenuTile(
+                    title: 'Store Photo',
+                    subtitle: 'Capture visit photos',
+                    icon: Icons.photo_camera_outlined,
+                    color: AppTheme.primary,
+                    onTap: () => context.push(AppRoutes.storePhoto),
+                  ),
+                  MenuTile(
+                    title: 'End Visit',
+                    subtitle: 'Complete active visit',
+                    icon: Icons.logout_outlined,
+                    color: AppTheme.danger,
+                    onTap: () => context.push(AppRoutes.endVisit),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

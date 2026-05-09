@@ -192,7 +192,7 @@ class EndVisitPage extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Visit completed and queued for sync.')),
     );
-    context.go(AppRoutes.visit);
+    context.go(AppRoutes.endVisitSuccess);
   }
 
   static String _formatDuration(Duration duration) {
@@ -202,6 +202,168 @@ class EndVisitPage extends StatelessWidget {
       return '$minutes min';
     }
     return '$hours hr $minutes min';
+  }
+}
+
+class EndVisitSuccessPage extends StatelessWidget {
+  const EndVisitSuccessPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = AppStateScope.of(context);
+    final visit = repository.lastCompletedVisit;
+    final customer = visit == null
+        ? null
+        : repository.getCustomerById(visit.customerId);
+
+    if (visit == null || customer == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Visit Completed')),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  color: AppTheme.primary,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No completed visit summary available.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Open Visit Plan to review today\'s call plans.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF6B7280),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () => context.go(AppRoutes.visit),
+                  child: const Text('Back to Visit Plan'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  onPressed: () => context.go(AppRoutes.home),
+                  child: const Text('Go to Home'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final summary = repository.getVisitSummary(visit.id);
+    final checkOutAt = visit.checkOutAt ?? DateTime.now();
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          context.go(AppRoutes.visit);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Visit Completed')),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: AppTheme.accent,
+                        size: 56,
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Visit completed',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        customer.name,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        customer.address,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFF6B7280),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const StatusChip(
+                        label: 'COMPLETED',
+                        color: AppTheme.accent,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SummaryCard(
+                title: 'Completed Visit Summary',
+                rows: [
+                  _SummaryRow(
+                    label: 'Check-in Time',
+                    value: DateFormatters.dateTime(visit.checkInAt),
+                  ),
+                  _SummaryRow(
+                    label: 'Check-out Time',
+                    value: DateFormatters.dateTime(checkOutAt),
+                  ),
+                  _SummaryRow(
+                    label: 'Visit Duration',
+                    value: EndVisitPage._formatDuration(
+                      checkOutAt.difference(visit.checkInAt),
+                    ),
+                  ),
+                  _SummaryRow(
+                    label: 'Store Activities',
+                    value:
+                        '${summary.salesOrderCount + summary.returnOrderCount + summary.promoCheckCount + summary.competitorActivityCount + summary.planogramCheckCount + summary.stockCheckCount + summary.storePhotoCount + summary.visitNoteCount}',
+                  ),
+                  _SummaryRow(
+                    label: 'Pending Sync',
+                    value: summary.pendingSyncCount.toString(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () => context.go(AppRoutes.visit),
+                child: const Text('Back to Visit Plan'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton(
+                onPressed: () => context.go(AppRoutes.home),
+                child: const Text('Go to Home'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

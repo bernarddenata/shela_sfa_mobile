@@ -84,6 +84,7 @@ class AppRoutes {
   static const visitNotes = '/store/visit-notes';
   static const storePhoto = '/store/store-photo';
   static const endVisit = '/store/end-visit';
+  static const endVisitSuccess = '/visit/end-visit-success';
   static const syncCenter = '/sync-center';
   static const syncDetail = '/sync-center/:syncItemId';
 
@@ -354,6 +355,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.endVisit,
         builder: (context, state) => const EndVisitPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.endVisitSuccess,
+        builder: (context, state) => const EndVisitSuccessPage(),
       ),
     ],
   );

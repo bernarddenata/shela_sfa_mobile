@@ -151,6 +151,12 @@ class _CallPlanCard extends StatelessWidget {
       CallPlanStatus.completed => AppTheme.accent,
       CallPlanStatus.missed => AppTheme.danger,
     };
+    final actionLabel = switch (callPlan.status) {
+      CallPlanStatus.notStarted => 'Start Visit',
+      CallPlanStatus.inProgress => 'Continue Visit',
+      CallPlanStatus.completed => 'Completed',
+      CallPlanStatus.missed => 'Start Visit',
+    };
 
     return Card(
       child: Padding(
@@ -212,7 +218,7 @@ class _CallPlanCard extends StatelessWidget {
                     onPressed: callPlan.status == CallPlanStatus.completed
                         ? null
                         : () => _startVisit(context, repository),
-                    child: const Text('Start Visit'),
+                    child: Text(actionLabel),
                   ),
                 ),
               ],
